@@ -33,7 +33,7 @@ export class IntentStore {
     return state.intents[intentId]
   }
 
-  async transition(intentId: string, expectedStatus: IntentStatus, nextStatus: IntentStatus, patch: Partial<Pick<PayoutIntent, 'executionId' | 'transactionHash' | 'transactionLink'>> = {}): Promise<PayoutIntent> {
+  async transition(intentId: string, expectedStatus: IntentStatus, nextStatus: IntentStatus, patch: Partial<Pick<PayoutIntent, 'blockedReason' | 'executionOutcome' | 'executionId' | 'transactionHash' | 'transactionLink'>> = {}): Promise<PayoutIntent> {
     const state = await this.read()
     const current = state.intents[intentId]
     if (current === undefined) throw new IntentStoreConflictError(`intent not found: ${intentId}`)

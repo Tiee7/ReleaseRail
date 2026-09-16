@@ -37,6 +37,8 @@ export type PayoutIntent = {
   reason: string
   canonicalPayloadHash: string
   status: IntentStatus
+  blockedReason?: string
+  executionOutcome?: 'failed' | 'unknown'
   executionId?: string
   transactionHash?: `0x${string}`
   transactionLink?: string
