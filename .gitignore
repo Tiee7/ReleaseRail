@@ -4,5 +4,6 @@ dist/
 .env.*
 !.env.example
 .releaserail/
+integrations/ezdsh/payout-policy.json
 evidence/live-proof.json
 evidence/*.mp4

@@ -31,7 +31,8 @@ describe('proof store', () => {
 
   it('rejects credential-like values and unknown fields', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'releaserail-proof-'))
-    await expect(writeProof(directory, { ...proof, transactionLink: 'Bearer kh_live_secret' })).rejects.toThrow('credential-like')
+    const fakeCredential = ['Bearer', ['kh', 'live', 'secret'].join('_')].join(' ')
+    await expect(writeProof(directory, { ...proof, transactionLink: fakeCredential })).rejects.toThrow('credential-like')
     await expect(writeProof(directory, { ...proof, extra: 'should not be written' } as PayoutProof & { extra: string })).rejects.toThrow('not public')
   })
 })

@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "releaserail": {
+      "command": "node",
+      "args": ["dist/mcp-server.js"],
+      "cwd": "${RELEASERAIL_ROOT}",
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+        "KEEPERHUB_API_KEY": "${KEEPERHUB_API_KEY}",
+        "KEEPERHUB_BASE_URL": "https://app.keeperhub.com/api",
+        "RELEASERAIL_POLICY_FILE": "${RELEASERAIL_ROOT}/integrations/ezdsh/payout-policy.json",
+        "RELEASERAIL_STATE_DIR": "${RELEASERAIL_ROOT}/.releaserail/state",
+        "RELEASERAIL_PROOF_DIR": "${RELEASERAIL_ROOT}/.releaserail/proofs",
+        "RELEASERAIL_RPC_URL": "${RELEASERAIL_RPC_URL}"
+      }
+    }
+  }
+}

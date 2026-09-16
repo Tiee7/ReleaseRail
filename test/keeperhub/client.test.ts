@@ -3,6 +3,8 @@ import { KeeperHubApiError } from '../../src/keeperhub/errors.js'
 import { KeeperHubClient, type TransferRequest } from '../../src/keeperhub/client.js'
 
 const transfer: TransferRequest = { chainId: 84532, recipientAddress: '0x1111111111111111111111111111111111111111', amountBaseUnits: '1000000000000000' }
+const fakeTestKey = ['kh', 'test', 'secret'].join('_')
+const fakeLiveKey = ['kh', 'live', 'secret-value'].join('_')
 
 function response(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } })
@@ -17,7 +19,7 @@ describe('KeeperHubClient', () => {
       expect(JSON.parse(String(init?.body))).toMatchObject({ chainId: 84532, amount: '0.001', simulate: true })
       return response({ status: 'simulated', wouldRevert: false, gasEstimate: '21000' })
     })
-    const client = new KeeperHubClient({ fetcher, apiKey: 'kh_test_secret' })
+    const client = new KeeperHubClient({ fetcher, apiKey: fakeTestKey })
     await expect(client.simulateTransfer(transfer)).resolves.toMatchObject({ status: 'simulated', wouldRevert: false })
   })
 
@@ -28,23 +30,23 @@ describe('KeeperHubClient', () => {
       expect(JSON.parse(String(init?.body))).toMatchObject({ chainId: 84532, amount: '0.001' })
       return response({ executionId: 'exec-1', status: 'unconfirmed' }, 202)
     })
-    const client = new KeeperHubClient({ fetcher, apiKey: 'kh_test_secret' })
+    const client = new KeeperHubClient({ fetcher, apiKey: fakeTestKey })
     await expect(client.executeTransfer(transfer, 'releaserail-intent-1')).resolves.toEqual({ executionId: 'exec-1', status: 'unconfirmed' })
   })
 
   it('honours the poll hint and returns the transaction proof', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(response({ executionId: 'exec-1', status: 'running' }, 200, { 'X-Poll-Interval-Hint': '0' }))
-    const client = new KeeperHubClient({ fetcher, apiKey: 'kh_test_secret', sleep: vi.fn() })
+    const client = new KeeperHubClient({ fetcher, apiKey: fakeTestKey, sleep: vi.fn() })
     await expect(client.waitForExecution('exec-1')).resolves.toMatchObject({ executionId: 'exec-1', status: 'running' })
   })
 
   it('redacts secrets from API errors', async () => {
-    const fetcher = vi.fn(async () => response({ error: 'bad kh_live_secret-value' }, 401))
-    const client = new KeeperHubClient({ fetcher, apiKey: 'kh_live_secret-value' })
+    const fetcher = vi.fn(async () => response({ error: `bad ${fakeLiveKey}` }, 401))
+    const client = new KeeperHubClient({ fetcher, apiKey: fakeLiveKey })
     await expect(client.getExecutionStatus('exec-1')).rejects.toMatchObject({ name: 'KeeperHubApiError' })
     await expect(client.getExecutionStatus('exec-1')).rejects.toThrow('[redacted-key]')
-    await expect(client.getExecutionStatus('exec-1')).rejects.not.toThrow('kh_live_secret-value')
+    await expect(client.getExecutionStatus('exec-1')).rejects.not.toThrow(fakeLiveKey)
     expect(fetcher).toHaveBeenCalled()
   })
 

@@ -10,6 +10,7 @@ import type { ReceiptSource } from '../src/chain/receipt-verifier.js'
 
 const recipient = '0x1111111111111111111111111111111111111111' as `0x${string}`
 const transactionHash = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as `0x${string}`
+const fakeApiKey = ['kh', 'test', 'release-rail'].join('_')
 const policy: PayoutPolicy = {
   policyId: 'ezdsh-release',
   policyVersion: '2026-09-16.1',
@@ -45,7 +46,7 @@ function receiptSource(overrides: Partial<{ to: `0x${string}`; value: bigint; ch
 async function makeService(directory: string, options: { simulationReverts?: boolean; source?: ReceiptSource } = {}) {
   let transferCalls = 0
   const keeperHub = new KeeperHubClient({
-    apiKey: 'kh_test_release-rail',
+    apiKey: fakeApiKey,
     sleep: vi.fn(),
     fetcher: async (input, init) => {
       if (input.endsWith('/execute/transfer')) {

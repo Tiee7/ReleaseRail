@@ -1,0 +1,11 @@
+{
+  "policyId": "ezdsh-release-testnet",
+  "policyVersion": "2026-09-16.1",
+  "repository": "Tiee7/EzDSH",
+  "chainId": 84532,
+  "asset": "native",
+  "maxAmountBaseUnits": "1000000000000000",
+  "recipients": {
+    "Tiee7": "0x0000000000000000000000000000000000000001"
+  }
+}
