@@ -281,7 +281,7 @@ git commit -m "docs: package EzDSH integration and hackathon evidence"
 - Create: `SUBMISSION_MAIN.md`
 - Create: `SUBMISSION_BOUNTY.md`
 
-- [ ] **Step 1: Run the public EzDSH release/contribution candidate check without credentials.** Record the exact release URL, contribution commit URL, observed contributor, and evidence hash.
+- [x] **Step 1: Run the public EzDSH release/contribution candidate check without credentials.** Record the exact release URL, contribution commit URL, observed contributor, and evidence hash.
 
 - [ ] **Step 2: Configure KeeperHub credentials only in the process environment and run a small testnet simulation.** Save no credential material.
 
@@ -289,7 +289,7 @@ git commit -m "docs: package EzDSH integration and hackathon evidence"
 
 - [ ] **Step 4: Re-run the same execution and verify that no second transfer is produced.**
 
-- [ ] **Step 5: Run the final gates:**
+- [x] **Step 5: Run the final gates:**
 
 ```bash
 pnpm test

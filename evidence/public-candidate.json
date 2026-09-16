@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-09-16T23:34:00+08:00",
+  "repository": "Tiee7/EzDSH",
+  "tag": "v1.8.1559",
+  "releaseUrl": "https://github.com/Tiee7/EzDSH/releases/tag/v1.8.1559",
+  "releaseTargetSha": "271a5bd425e8977a400d026a535ecd8155f5dc09",
+  "contributionCommit": "83d0e7a9e99cbb1ff0192502a7890d291c5b89e0",
+  "commitUrl": "https://github.com/Tiee7/EzDSH/commit/83d0e7a9e99cbb1ff0192502a7890d291c5b89e0",
+  "expectedContributor": "Tiee7",
+  "observedContributor": "Tiee7",
+  "commitInRelease": true,
+  "candidateId": "candidate-268dc9f5e3e32d28b6e0972e",
+  "evidenceHash": "268dc9f5e3e32d28b6e0972e721fd73e784f73f07c3a805881d67eb7a047e604",
+  "source": "GitHub public API via ReleaseRail GitHub evidence verifier"
+}
