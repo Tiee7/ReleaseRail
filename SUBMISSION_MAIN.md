@@ -1,6 +1,6 @@
 # Main track submission: ReleaseRail × EzDSH
 
-Status: source and public release evidence are ready; live KeeperHub testnet proof and demo URL remain to be filled after the API key/RPC are available.
+Status: source and public release evidence are ready at the current local main revision; live KeeperHub testnet proof and demo URL remain to be filled after the API key/RPC and Tiee7 publishing session are available.
 
 ## BUIDL
 

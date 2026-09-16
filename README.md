@@ -23,9 +23,12 @@ pnpm install
 pnpm test
 pnpm build
 pnpm cli help
+pnpm preflight
 ```
 
 Copy and edit the policy example locally, then follow [operations.md](docs/operations.md) or the [judge demo runbook](docs/demo-runbook.md). The EzDSH MCP template and prompt are under [integrations/ezdsh](integrations/ezdsh/).
+
+`pnpm preflight` reports whether the local build, policy file, KeeperHub key, and RPC URL are ready without printing any credential values.
 
 ## Safety boundary
 

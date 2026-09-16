@@ -7,6 +7,7 @@ ReleaseRail is a standalone MCP/CLI integration for the KeeperHub Agent Economy 
 ```bash
 pnpm install
 pnpm build
+pnpm preflight
 cp integrations/ezdsh/payout-policy.example.json integrations/ezdsh/payout-policy.json
 ```
 
