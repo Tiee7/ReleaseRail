@@ -1,4 +1,5 @@
 import { createServiceFromEnvironment } from './runtime.js'
+import { inspectPreflight } from './preflight.js'
 
 type Arguments = { command: string; options: Record<string, string> }
 
@@ -28,13 +29,18 @@ function printResult(summary: string, data: unknown): void {
 }
 
 export function helpText(): string {
-  return `ReleaseRail CLI\n\nCommands:\n  candidate --repository owner/name --tag vX --contribution-commit sha --expected-contributor login\n  prepare --candidate-id id --policy-id id --recipient-address 0x... --amount-base-units integer --reason text\n  approve --intent-id id --expected-intent-hash hash\n  simulate --intent-id id\n  execute --intent-id id --expected-intent-hash hash\n  proof --intent-id id\n\nEnvironment:\n  RELEASERAIL_POLICY_FILE, RELEASERAIL_STATE_DIR, RELEASERAIL_PROOF_DIR\n  GITHUB_TOKEN, KEEPERHUB_API_KEY, KEEPERHUB_BASE_URL, RELEASERAIL_RPC_URL`
+  return `ReleaseRail CLI\n\nCommands:\n  candidate --repository owner/name --tag vX --contribution-commit sha --expected-contributor login\n  prepare --candidate-id id --policy-id id --recipient-address 0x... --amount-base-units integer --reason text\n  approve --intent-id id --expected-intent-hash hash\n  simulate --intent-id id\n  execute --intent-id id --expected-intent-hash hash\n  proof --intent-id id\n  preflight\n\nEnvironment:\n  RELEASERAIL_POLICY_FILE, RELEASERAIL_STATE_DIR, RELEASERAIL_PROOF_DIR\n  GITHUB_TOKEN, KEEPERHUB_API_KEY, KEEPERHUB_BASE_URL, RELEASERAIL_RPC_URL`
 }
 
 export async function runCli(argv: string[]): Promise<void> {
   const { command, options } = parseArguments(argv)
   if (command === 'help' || command === '--help' || command === '-h') {
     process.stdout.write(`${helpText()}\n`)
+    return
+  }
+  if (command === 'preflight') {
+    const report = await inspectPreflight()
+    printResult(report.ready ? 'live prerequisites are present' : 'live prerequisites are incomplete; no secrets were inspected', report)
     return
   }
   const service = await createServiceFromEnvironment()
