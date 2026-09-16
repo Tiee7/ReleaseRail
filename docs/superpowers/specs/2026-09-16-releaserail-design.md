@@ -114,6 +114,7 @@ type ReleaseCandidate = {
 type PayoutIntent = {
   intentId: string
   candidateId: string
+  evidenceHash: string
   policyId: string
   policyVersion: string
   recipientAddress: `0x${string}`
@@ -219,4 +220,3 @@ Live acceptance evidence must include:
 ## Acceptance criteria
 
 The main-track artifact is ready only when a clean checkout can run the mocked test suite, start the MCP server, reproduce a candidate from public EzDSH release evidence, prepare and approve an intent, and either run the live testnet flow or fail closed with a recorded external prerequisite. The final submission must contain a confirmed KeeperHub transaction link; a mock-only demo is not sufficient.
-
