@@ -1,8 +1,9 @@
 import { createPublicClient, http, type Hash } from 'viem'
 import { baseSepolia, sepolia } from 'viem/chains'
+import { isSupportedTestnetChainId, SUPPORTED_TESTNET_CHAIN_IDS, type SupportedTestnetChainId } from '../domain/chains.js'
 
-export const SUPPORTED_RECEIPT_CHAIN_IDS = [84532, 11155111] as const
-export type SupportedReceiptChainId = (typeof SUPPORTED_RECEIPT_CHAIN_IDS)[number]
+export const SUPPORTED_RECEIPT_CHAIN_IDS = SUPPORTED_TESTNET_CHAIN_IDS
+export type SupportedReceiptChainId = SupportedTestnetChainId
 
 type TransactionReceipt = {
   status: 'success' | 'reverted'
@@ -49,7 +50,7 @@ export class ViemReceiptSource implements ReceiptSource {
   private readonly client: RpcClient
 
   constructor(chainId: SupportedReceiptChainId, rpcUrl: string) {
-    if (!SUPPORTED_RECEIPT_CHAIN_IDS.includes(chainId)) throw new Error(`unsupported receipt chain: ${chainId}`)
+    if (!isSupportedTestnetChainId(chainId)) throw new Error(`unsupported receipt chain: ${chainId}`)
     const chain = chainId === 84532 ? baseSepolia : sepolia
     this.client = createPublicClient({ chain, transport: http(rpcUrl) }) as unknown as RpcClient
   }
@@ -82,7 +83,7 @@ export async function verifyNativeTransfer(source: ReceiptSource, expected: Nati
     amountBaseUnits: expected.amountBaseUnits,
   }
 
-  if (!SUPPORTED_RECEIPT_CHAIN_IDS.includes(expected.chainId as SupportedReceiptChainId)) {
+  if (!isSupportedTestnetChainId(expected.chainId)) {
     return { ...result, reason: `unsupported receipt chain: ${expected.chainId}` }
   }
   if (!/^[0-9]+$/.test(expected.amountBaseUnits) || BigInt(expected.amountBaseUnits) <= 0n) {

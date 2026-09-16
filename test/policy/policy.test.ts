@@ -20,7 +20,8 @@ describe('validatePayout', () => {
     ['unknown recipient', { recipientAddress: '0x2222222222222222222222222222222222222222' }, 'not allowlisted'],
     ['over cap', { amountBaseUnits: '1001' }, 'exceeds policy maximum'],
     ['zero amount', { amountBaseUnits: '0' }, 'positive base-unit'],
-    ['bad address', { recipientAddress: 'not-an-address' }, 'address is invalid']
+    ['bad address', { recipientAddress: 'not-an-address' }, 'address is invalid'],
+    ['mainnet chain', { policy: { ...policy, chainId: 1 } }, 'not an allowed testnet']
   ])('blocks %s', (_name, overrides, message) => {
     const input = { candidate, policy, recipientAddress, amountBaseUnits: '42', reason: 'reason', ...overrides } as Parameters<typeof validatePayout>[0]
     expect(() => validatePayout(input)).toThrow(message)

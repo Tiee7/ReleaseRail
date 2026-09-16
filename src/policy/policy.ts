@@ -1,4 +1,5 @@
 import { canonicalJson, sha256Hex } from '../domain/canonical-json.js'
+import { isSupportedTestnetChainId } from '../domain/chains.js'
 import { intentId } from '../domain/ids.js'
 import type { PayoutIntent, PayoutPolicy, ReleaseCandidate } from '../domain/types.js'
 
@@ -31,7 +32,7 @@ export function validatePayout(input: PreparePayoutInput): PayoutIntent {
   if (mappedAddress === undefined || mappedAddress.toLowerCase() !== recipientAddress.toLowerCase()) {
     throw new Error(`recipient is not allowlisted for ${candidate.observedContributor}`)
   }
-  if (!Number.isInteger(policy.chainId) || policy.chainId <= 0) throw new Error('policy chain is invalid')
+  if (!Number.isInteger(policy.chainId) || !isSupportedTestnetChainId(policy.chainId)) throw new Error('policy chain is not an allowed testnet')
   if (policy.asset !== 'native') throw new Error('only native asset is supported in P0')
   if (input.reason.trim().length === 0 || input.reason.length > 240) throw new Error('reason must be between 1 and 240 characters')
   const payload = {
