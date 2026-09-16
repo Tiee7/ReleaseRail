@@ -123,7 +123,8 @@ export class ReleaseRailService {
       try {
         execution = await this.reconcile(intent.executionId)
       } catch (error) {
-        return { intent, execution: { executionId: intent.executionId, status: 'unknown' }, ...(error instanceof Error ? { verification: { verified: false, chainId: intent.chainId, transactionHash: intent.transactionHash ?? ('0x' + '0'.repeat(64)) as `0x${string}`, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits, reason: `reconciliation unavailable: ${error.message}` } } : {}) }
+        const unknown = await this.intents.transition(intent.intentId, 'executing', 'executing', { executionOutcome: 'unknown' })
+        return { intent: unknown, execution: { executionId: intent.executionId, status: 'unknown' }, ...(error instanceof Error ? { verification: { verified: false, chainId: intent.chainId, transactionHash: intent.transactionHash ?? ('0x' + '0'.repeat(64)) as `0x${string}`, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits, reason: `reconciliation unavailable: ${error.message}` } } : {}) }
       }
     } else {
       const accepted = await this.keeperHub.executeTransfer({ chainId: intent.chainId, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits }, idempotencyKey(intent.canonicalPayloadHash))
@@ -135,7 +136,8 @@ export class ReleaseRailService {
       try {
         execution = { ...accepted, ...(await this.reconcile(accepted.executionId)) }
       } catch (error) {
-        return { intent, execution: { ...accepted, status: 'unknown' }, ...(error instanceof Error && accepted.transactionHash === undefined ? {} : error instanceof Error ? { verification: { verified: false, chainId: intent.chainId, transactionHash: accepted.transactionHash!, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits, reason: `reconciliation unavailable: ${error.message}` } } : {}) }
+        const unknown = await this.intents.transition(intent.intentId, 'executing', 'executing', { executionOutcome: 'unknown', ...(accepted.transactionHash === undefined ? {} : { transactionHash: accepted.transactionHash }) })
+        return { intent: unknown, execution: { ...accepted, status: 'unknown' }, ...(error instanceof Error && accepted.transactionHash === undefined ? {} : error instanceof Error ? { verification: { verified: false, chainId: intent.chainId, transactionHash: accepted.transactionHash!, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits, reason: `reconciliation unavailable: ${error.message}` } } : {}) }
       }
     }
 
