@@ -21,6 +21,7 @@ describe('validatePayout', () => {
     ['over cap', { amountBaseUnits: '1001' }, 'exceeds policy maximum'],
     ['zero amount', { amountBaseUnits: '0' }, 'positive base-unit'],
     ['bad address', { recipientAddress: 'not-an-address' }, 'address is invalid'],
+    ['template address', { recipientAddress: '0x0000000000000000000000000000000000000001' }, 'template placeholder'],
     ['mainnet chain', { policy: { ...policy, chainId: 1 } }, 'not an allowed testnet']
   ])('blocks %s', (_name, overrides, message) => {
     const input = { candidate, policy, recipientAddress, amountBaseUnits: '42', reason: 'reason', ...overrides } as Parameters<typeof validatePayout>[0]

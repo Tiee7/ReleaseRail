@@ -16,6 +16,11 @@ function isAddress(value: string): value is `0x${string}` {
   return /^0x[0-9a-fA-F]{40}$/.test(value)
 }
 
+function isTemplateAddress(value: `0x${string}`): boolean {
+  const normalized = value.toLowerCase()
+  return normalized === `0x${'0'.repeat(40)}` || normalized === `0x${'0'.repeat(39)}1`
+}
+
 function isUnsignedInteger(value: string): boolean {
   return /^(0|[1-9][0-9]*)$/.test(value)
 }
@@ -25,6 +30,7 @@ export function validatePayout(input: PreparePayoutInput): PayoutIntent {
   if (candidate.repository !== policy.repository) throw new Error('policy repository does not match candidate')
   if (!candidate.commitInRelease) throw new Error('candidate contribution is not in the release')
   if (!isAddress(recipientAddress)) throw new Error('recipient address is invalid')
+  if (isTemplateAddress(recipientAddress)) throw new Error('recipient address is still a template placeholder')
   if (!isUnsignedInteger(amountBaseUnits) || amountBaseUnits === '0') throw new Error('amount must be a positive base-unit integer')
   if (!isUnsignedInteger(policy.maxAmountBaseUnits)) throw new Error('policy maximum is invalid')
   if (BigInt(amountBaseUnits) > BigInt(policy.maxAmountBaseUnits)) throw new Error('amount exceeds policy maximum')
