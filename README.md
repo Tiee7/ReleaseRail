@@ -30,6 +30,8 @@ Copy and edit the policy example locally, then follow [operations.md](docs/opera
 
 `pnpm preflight` reports whether the local build, policy file, KeeperHub key, and RPC URL are ready without printing any credential values.
 
+Publish the main-track repository only through the Tiee7 identity, following [publish.md](docs/publish.md).
+
 ## Safety boundary
 
 - P0 is one native-asset testnet payout on Base Sepolia or Ethereum Sepolia.
