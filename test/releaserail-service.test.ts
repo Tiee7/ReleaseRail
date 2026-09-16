@@ -43,7 +43,7 @@ function receiptSource(overrides: Partial<{ to: `0x${string}`; value: bigint; ch
   }
 }
 
-async function makeService(directory: string, options: { simulationReverts?: boolean; source?: ReceiptSource } = {}) {
+async function makeService(directory: string, options: { simulationReverts?: boolean; source?: ReceiptSource; statusUnavailable?: boolean } = {}) {
   let transferCalls = 0
   const keeperHub = new KeeperHubClient({
     apiKey: fakeApiKey,
@@ -56,7 +56,10 @@ async function makeService(directory: string, options: { simulationReverts?: boo
         }
         return json({ executionId: 'exec-1', status: 'unconfirmed' }, 202)
       }
-      if (input.endsWith('/status')) return json({ executionId: 'exec-1', status: 'completed', transactionHash, transactionLink: `https://sepolia.basescan.org/tx/${transactionHash}` }, 200, { 'X-Poll-Interval-Hint': '0' })
+      if (input.endsWith('/status')) {
+        if (options.statusUnavailable === true) throw new Error('status endpoint unavailable')
+        return json({ executionId: 'exec-1', status: 'completed', transactionHash, transactionLink: `https://sepolia.basescan.org/tx/${transactionHash}` }, 200, { 'X-Poll-Interval-Hint': '0' })
+      }
       throw new Error(`unexpected KeeperHub URL: ${input}`)
     },
   })
@@ -115,5 +118,19 @@ describe('ReleaseRailService', () => {
     const result = await service.executePayout(prepared.intentId, prepared.canonicalPayloadHash)
     expect(result.intent).toMatchObject({ status: 'blocked', transactionHash, blockedReason: expect.stringContaining('value mismatch') })
     expect(result.verification?.verified).toBe(false)
+  })
+
+  it('reconciles an unknown execution without broadcasting a second time', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'releaserail-service-'))
+    const { service, transferCalls } = await makeService(directory, { statusUnavailable: true })
+    const candidate = await service.releaseCandidate({ repository: 'Tiee7/EzDSH', tag: 'v1.8.1559', contributionCommit: 'contribution-sha', expectedContributor: 'Tiee7' })
+    const prepared = await service.preparePayout({ candidateId: candidate.candidateId, policyId: policy.policyId, recipientAddress: recipient, amountBaseUnits: '1000000', reason: 'Contribution shipped in EzDSH release' })
+    await service.approvePayout(prepared.intentId, prepared.canonicalPayloadHash)
+    await service.simulatePayout(prepared.intentId)
+    const first = await service.executePayout(prepared.intentId, prepared.canonicalPayloadHash)
+    const second = await service.executePayout(prepared.intentId, prepared.canonicalPayloadHash)
+    expect(first.intent).toMatchObject({ status: 'executing', executionId: 'exec-1' })
+    expect(second).toMatchObject({ intent: { status: 'executing', executionId: 'exec-1' }, execution: { status: 'unknown' } })
+    expect(transferCalls()).toBe(2)
   })
 })

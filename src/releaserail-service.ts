@@ -120,7 +120,11 @@ export class ReleaseRailService {
 
     let execution: ExecutionStatus
     if (intent.status === 'executing' && intent.executionId !== undefined) {
-      execution = await this.reconcile(intent.executionId)
+      try {
+        execution = await this.reconcile(intent.executionId)
+      } catch (error) {
+        return { intent, execution: { executionId: intent.executionId, status: 'unknown' }, ...(error instanceof Error ? { verification: { verified: false, chainId: intent.chainId, transactionHash: intent.transactionHash ?? ('0x' + '0'.repeat(64)) as `0x${string}`, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits, reason: `reconciliation unavailable: ${error.message}` } } : {}) }
+      }
     } else {
       const accepted = await this.keeperHub.executeTransfer({ chainId: intent.chainId, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits }, idempotencyKey(intent.canonicalPayloadHash))
       intent = await this.intents.transition(intent.intentId, 'simulated', 'executing', {
