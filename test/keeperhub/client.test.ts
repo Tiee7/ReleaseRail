@@ -51,7 +51,9 @@ describe('KeeperHubClient', () => {
   })
 
   it('requires an API key before making a request', async () => {
-    const client = new KeeperHubClient({ fetcher: vi.fn() })
+    const fetcher = vi.fn()
+    const client = new KeeperHubClient({ fetcher, apiKey: '' })
     await expect(client.getExecutionStatus('exec-1')).rejects.toThrow('KEEPERHUB_API_KEY')
+    expect(fetcher).not.toHaveBeenCalled()
   })
 })
