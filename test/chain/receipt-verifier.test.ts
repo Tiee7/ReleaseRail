@@ -30,6 +30,15 @@ describe('verifyNativeTransfer', () => {
     expect(wrongValue.reason).toContain('value mismatch')
   })
 
+  it('accepts a matching native transfer inside a contract call trace', async () => {
+    const contractSource = source({ to: '0x3333333333333333333333333333333333333333' as `0x${string}`, value: 0n })
+    contractSource.getNativeTransferCalls = async () => [{ to: recipient, value: 1000000000000000n }]
+
+    const result = await verifyNativeTransfer(contractSource, { chainId: 84532, recipientAddress: recipient, amountBaseUnits: '1000000000000000', transactionHash: hash })
+
+    expect(result).toMatchObject({ verified: true, blockNumber: '123' })
+  })
+
   it('rejects a chain mismatch', async () => {
     const result = await verifyNativeTransfer(source({ chainId: 11155111 }), { chainId: 84532, recipientAddress: recipient, amountBaseUnits: '1000000000000000', transactionHash: hash })
     expect(result).toMatchObject({ verified: false, reason: 'chain mismatch: source=11155111, expected=84532' })

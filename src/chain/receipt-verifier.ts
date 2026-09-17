@@ -21,12 +21,19 @@ type RpcClient = {
   getChainId: () => Promise<number>
   getTransactionReceipt: (args: { hash: Hash }) => Promise<TransactionReceipt>
   getTransaction: (args: { hash: Hash }) => Promise<Transaction>
+  request: (args: { method: string; params?: readonly unknown[] }) => Promise<unknown>
+}
+
+export type NativeTransferCall = {
+  to: `0x${string}`
+  value: bigint
 }
 
 export type ReceiptSource = {
   getChainId: () => Promise<number>
   getTransactionReceipt: (hash: Hash) => Promise<TransactionReceipt>
   getTransaction: (hash: Hash) => Promise<Transaction>
+  getNativeTransferCalls?: (hash: Hash) => Promise<NativeTransferCall[]>
 }
 
 export type NativeTransferExpectation = {
@@ -72,6 +79,21 @@ export class ViemReceiptSource implements ReceiptSource {
       ...(transaction.chainId === undefined ? {} : { chainId: transaction.chainId }),
     }
   }
+
+  async getNativeTransferCalls(hash: Hash): Promise<NativeTransferCall[]> {
+    const trace = await this.client.request({ method: 'debug_traceTransaction', params: [hash, { tracer: 'callTracer' }] })
+    return collectNativeTransferCalls(trace)
+  }
+}
+
+function collectNativeTransferCalls(value: unknown): NativeTransferCall[] {
+  if (typeof value !== 'object' || value === null) return []
+  const record = value as Record<string, unknown>
+  const calls = Array.isArray(record.calls) ? record.calls.flatMap((call) => collectNativeTransferCalls(call)) : []
+  const to = record.to
+  const transferValue = record.value
+  if (typeof to !== 'string' || !/^0x[0-9a-f]{40}$/i.test(to) || typeof transferValue !== 'string' || !/^0x[0-9a-f]+$/i.test(transferValue)) return calls
+  return [{ to: to as `0x${string}`, value: BigInt(transferValue) }, ...calls]
 }
 
 export async function verifyNativeTransfer(source: ReceiptSource, expected: NativeTransferExpectation): Promise<ReceiptVerification> {
@@ -109,12 +131,21 @@ export async function verifyNativeTransfer(source: ReceiptSource, expected: Nati
     return { ...result, reason: 'receipt transaction hash mismatch' }
   }
   if (receipt.status !== 'success') return { ...result, reason: `receipt status is ${receipt.status}` }
-  if (transaction.to === null || transaction.to.toLowerCase() !== expected.recipientAddress.toLowerCase()) {
-    return { ...result, reason: 'recipient mismatch' }
+  const expectedValue = BigInt(expected.amountBaseUnits)
+  const directTransferMatches = transaction.to !== null && transaction.to.toLowerCase() === expected.recipientAddress.toLowerCase() && transaction.value === expectedValue
+  if (!directTransferMatches && source.getNativeTransferCalls !== undefined) {
+    let calls: NativeTransferCall[]
+    try {
+      calls = await source.getNativeTransferCalls(expected.transactionHash)
+    } catch (error) {
+      return { ...result, reason: `transfer trace lookup failed: ${error instanceof Error ? error.message : 'unknown error'}` }
+    }
+    if (calls.some((call) => call.to.toLowerCase() === expected.recipientAddress.toLowerCase() && call.value === expectedValue)) {
+      return { ...result, verified: true, blockNumber: receipt.blockNumber.toString() }
+    }
   }
-  if (transaction.value !== BigInt(expected.amountBaseUnits)) {
-    return { ...result, reason: `value mismatch: observed=${transaction.value.toString()}, expected=${expected.amountBaseUnits}` }
-  }
+  if (transaction.to === null || transaction.to.toLowerCase() !== expected.recipientAddress.toLowerCase()) return { ...result, reason: 'recipient mismatch' }
+  if (transaction.value !== expectedValue) return { ...result, reason: `value mismatch: observed=${transaction.value.toString()}, expected=${expected.amountBaseUnits}` }
 
   return { ...result, verified: true, blockNumber: receipt.blockNumber.toString() }
 }

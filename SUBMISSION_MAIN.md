@@ -1,13 +1,13 @@
 # Main track submission: ReleaseRail × EzDSH
 
-Status: source and public release evidence are ready at the current local main revision; live KeeperHub testnet proof and demo URL remain to be filled after the API key/RPC and Tiee7 publishing session are available.
+Status: the live KeeperHub testnet proof is confirmed; the remaining submission steps are publishing this repository under Tiee7 and recording the short demo video.
 
 ## BUIDL
 
 - Name: ReleaseRail
 - Track: Best Integration into a Live Project
 - Live project: [Tiee7/EzDSH](https://github.com/Tiee7/EzDSH)
-- Source repository: `TODO: publish this standalone repository under Tiee7`
+- Source repository: [Tiee7/ReleaseRail](https://github.com/Tiee7/ReleaseRail)
 - Demo URL: `TODO: record the EzDSH MCP flow`
 
 ## What ships
@@ -27,10 +27,11 @@ EzDSH is the live integration target; its source is not modified. ReleaseRail ru
 
 ## KeeperHub proof to attach
 
-- KeeperHub execution ID: `TODO`
-- Base Sepolia transaction URL: `TODO`
-- Redacted intent/proof JSON: `evidence/live-proof.json`
-- Second-run result: `TODO: same execution identity, no second transfer`
+- KeeperHub execution ID: `oecytu85by4mzs145bcn5`
+- Base Sepolia transaction URL: [verified transaction](https://sepolia.basescan.org/tx/0x8009dd6aefd6725418fec94e021c77c9570d58dd3f4c34e02cdcf7bea74f3c82)
+- Redacted intent/proof JSON: attach the local `evidence/live-proof.json` to the BUIDL submission; it remains gitignored intentionally
+- Receipt verification: `verified: true`, Base Sepolia block `46928205`
+- Second-run result: the same settled intent returned the original execution identity and transaction link; no second transfer was sent
 
 ## Why this is a real integration
 

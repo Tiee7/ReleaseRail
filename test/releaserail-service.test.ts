@@ -123,6 +123,28 @@ describe('ReleaseRailService', () => {
     expect(result.verification?.verified).toBe(false)
   })
 
+  it('reconciles a blocked contract-mediated transfer without broadcasting again', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'releaserail-service-'))
+    const outerSource = receiptSource({ to: '0x3333333333333333333333333333333333333333' as `0x${string}`, value: 0n })
+    const first = await makeService(directory, { source: outerSource })
+    const candidate = await first.service.releaseCandidate({ repository: 'Tiee7/EzDSH', tag: 'v1.8.1559', contributionCommit: 'contribution-sha', expectedContributor: 'Tiee7' })
+    const prepared = await first.service.preparePayout({ candidateId: candidate.candidateId, policyId: policy.policyId, recipientAddress: recipient, amountBaseUnits: '1000000', reason: 'Contribution shipped in EzDSH release' })
+    await first.service.approvePayout(prepared.intentId, prepared.canonicalPayloadHash)
+    await first.service.simulatePayout(prepared.intentId)
+    const blocked = await first.service.executePayout(prepared.intentId, prepared.canonicalPayloadHash)
+    expect(blocked.intent).toMatchObject({ status: 'blocked', executionId: 'exec-1', transactionHash })
+
+    const traceSource = receiptSource({ to: '0x3333333333333333333333333333333333333333' as `0x${string}`, value: 0n })
+    traceSource.getNativeTransferCalls = async () => [{ to: recipient, value: 1000000n }]
+    const second = await makeService(directory, { source: traceSource })
+    const reconciled = await second.service.executePayout(prepared.intentId, prepared.canonicalPayloadHash)
+
+    expect(reconciled.intent.status).toBe('settled')
+    expect(reconciled.verification?.verified).toBe(true)
+    expect(reconciled.proofPath).toContain('intent-')
+    expect(second.transferCalls()).toBe(0)
+  })
+
   it('reconciles an unknown execution without broadcasting a second time', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'releaserail-service-'))
     const { service, transferCalls } = await makeService(directory, { statusUnavailable: true })

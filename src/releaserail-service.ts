@@ -118,7 +118,10 @@ export class ReleaseRailService {
       const proof = await readProof(this.proofDirectory, intent.intentId)
       return { intent, execution: this.executionFromIntent(intent), ...(proof === undefined ? {} : { proofPath: join(this.proofDirectory, `${intent.intentId}.json`) }) }
     }
-    if (intent.status === 'blocked') throw new Error(`intent is blocked: ${intent.blockedReason ?? 'unknown reason'}`)
+    if (intent.status === 'blocked') {
+      if (intent.executionId !== undefined && intent.transactionHash !== undefined) return this.reconcileBlockedPayout(intent)
+      throw new Error(`intent is blocked: ${intent.blockedReason ?? 'unknown reason'}`)
+    }
     if (intent.status !== 'simulated' && intent.status !== 'executing') throw new Error(`intent must be simulated before execution, found ${intent.status}`)
 
     let execution: ExecutionStatus
@@ -195,6 +198,39 @@ export class ReleaseRailService {
 
   private async reconcile(executionId: string): Promise<ExecutionStatus> {
     return this.keeperHub.waitForExecution(executionId, { maxPolls: 12 })
+  }
+
+  private async reconcileBlockedPayout(intent: PayoutIntent): Promise<PayoutExecutionResult> {
+    const execution = await this.reconcile(intent.executionId as string)
+    const transactionHash = execution.transactionHash ?? intent.transactionHash
+    if (execution.status === 'failed' || transactionHash === undefined) return { intent, execution }
+    let source: ReceiptSource | undefined
+    try {
+      source = this.receiptSourceFactory?.(intent.chainId)
+    } catch (error) {
+      return { intent, execution, verification: { verified: false, chainId: intent.chainId, transactionHash, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits, reason: `receipt source unavailable: ${error instanceof Error ? error.message : 'unknown error'}` } }
+    }
+    if (source === undefined) return { intent, execution }
+    const verification = await verifyNativeTransfer(source, { chainId: intent.chainId, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits, transactionHash })
+    if (!verification.verified) return { intent, execution, verification }
+    const candidate = await this.getCandidate(intent.candidateId)
+    const policy = this.policies[intent.policyId]
+    if (policy === undefined) throw new Error(`policy not found: ${intent.policyId}`)
+    const proofPath = await writeProof(this.proofDirectory, {
+      intentId: intent.intentId,
+      candidate: { repository: candidate.repository, tag: candidate.tag, releaseUrl: candidate.releaseUrl, commitUrl: candidate.commitUrl, evidenceHash: candidate.evidenceHash },
+      policy: { policyId: policy.policyId, policyVersion: policy.policyVersion, chainId: policy.chainId, asset: policy.asset },
+      recipientAddress: intent.recipientAddress,
+      amountBaseUnits: intent.amountBaseUnits,
+      canonicalPayloadHash: intent.canonicalPayloadHash,
+      ...(intent.executionId === undefined ? {} : { keeperHubExecutionId: intent.executionId }),
+      transactionHash,
+      ...(execution.transactionLink === undefined && intent.transactionLink === undefined ? {} : { transactionLink: execution.transactionLink ?? intent.transactionLink }),
+      receiptVerified: true,
+      recordedAt: this.now(),
+    })
+    const settled = await this.intents.transition(intent.intentId, 'blocked', 'settled', { blockedReason: null, transactionHash, ...(execution.transactionLink === undefined && intent.transactionLink === undefined ? {} : { transactionLink: execution.transactionLink ?? intent.transactionLink }) })
+    return { intent: settled, execution, verification, proofPath }
   }
 
   private async requireIntent(intentIdValue: string): Promise<PayoutIntent> {
