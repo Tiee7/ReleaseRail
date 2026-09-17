@@ -51,6 +51,7 @@ export type PayoutProof = {
   candidate: Pick<ReleaseCandidate, 'repository' | 'tag' | 'releaseUrl' | 'commitUrl' | 'evidenceHash'>
   policy: Pick<PayoutPolicy, 'policyId' | 'policyVersion' | 'chainId' | 'asset'>
   recipientAddress: `0x${string}`
+  sourceAddress?: `0x${string}`
   amountBaseUnits: string
   canonicalPayloadHash: string
   keeperHubExecutionId?: string

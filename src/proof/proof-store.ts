@@ -7,6 +7,7 @@ const PUBLIC_FIELDS = new Set<keyof PayoutProof>([
   'candidate',
   'policy',
   'recipientAddress',
+  'sourceAddress',
   'amountBaseUnits',
   'canonicalPayloadHash',
   'keeperHubExecutionId',

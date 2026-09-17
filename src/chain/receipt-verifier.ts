@@ -12,6 +12,7 @@ type TransactionReceipt = {
 }
 
 type Transaction = {
+  from?: `0x${string}`
   to: `0x${string}` | null
   value: bigint
   chainId?: number
@@ -49,6 +50,7 @@ export type ReceiptVerification = {
   transactionHash: `0x${string}`
   recipientAddress: `0x${string}`
   amountBaseUnits: string
+  sourceAddress?: `0x${string}`
   blockNumber?: string
   reason?: string
 }
@@ -74,6 +76,7 @@ export class ViemReceiptSource implements ReceiptSource {
   async getTransaction(hash: Hash): Promise<Transaction> {
     const transaction = await this.client.getTransaction({ hash })
     return {
+      ...(transaction.from === undefined ? {} : { from: transaction.from }),
       to: transaction.to,
       value: transaction.value,
       ...(transaction.chainId === undefined ? {} : { chainId: transaction.chainId }),
@@ -122,6 +125,8 @@ export async function verifyNativeTransfer(source: ReceiptSource, expected: Nati
   } catch (error) {
     return { ...result, reason: `receipt lookup failed: ${error instanceof Error ? error.message : 'unknown error'}` }
   }
+
+  if (transaction.from !== undefined) result.sourceAddress = transaction.from
 
   if (sourceChainId !== expected.chainId) return { ...result, reason: `chain mismatch: source=${sourceChainId}, expected=${expected.chainId}` }
   if (transaction.chainId !== undefined && transaction.chainId !== expected.chainId) {

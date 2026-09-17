@@ -155,6 +155,19 @@ h2 { margin-bottom: 0; font-size: 27px; letter-spacing: -.04em; font-weight: 500
 .detail-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .detail-link { display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: 12px; text-decoration: none; }
 .detail-link:hover { text-decoration: underline; }
+.control-box { display: grid; gap: 14px; padding-top: 20px; }
+.control-copy { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.action-button { min-height: 38px; border: 1px solid var(--line); border-radius: 8px; background: #1a211c; color: var(--text); cursor: pointer; font-size: 11px; transition: border-color .18s, background .18s, transform .18s; }
+.action-button:hover:not(:disabled) { border-color: var(--green-deep); background: #223021; }
+.action-button:active:not(:disabled) { transform: translateY(1px); }
+.action-button.primary { border-color: var(--green-deep); color: var(--green); }
+.action-button:disabled { cursor: not-allowed; opacity: .38; }
+.confirm-line { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.confirm-line input { accent-color: var(--green); margin-top: 2px; }
+.action-message { min-height: 16px; margin: 0; color: var(--green); font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.action-message.error { color: var(--danger); }
+.source-note { margin: 7px 0 0; color: var(--faint); font-size: 11px; line-height: 1.5; }
 .proof-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .proof-cell { display: grid; gap: 6px; }
 .proof-cell .detail-label { margin-bottom: 0; }
@@ -197,6 +210,7 @@ h2 { margin-bottom: 0; font-size: 27px; letter-spacing: -.04em; font-weight: 500
   .row-right { display: none; }
   .detail-column { padding: 18px; }
   .proof-grid { grid-template-columns: 1fr; }
+  .action-grid { grid-template-columns: 1fr; }
   .footer { display: grid; gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
@@ -234,6 +248,40 @@ function renderList(payouts) {
   document.querySelectorAll('[data-intent]').forEach((button) => button.addEventListener('click', () => { state.selectedIntentId = button.dataset.intent; history.replaceState(null, '', '#' + state.selectedIntentId); render() }))
 }
 
+function renderActions(payout) {
+  const intent = payout.intent
+  if (intent.status === 'settled') return '<div class="control-box"><span class="detail-label">CONTROLLED ACTION</span><p class="control-copy">Settlement is final. Replaying this intent reuses its existing execution identity and cannot create a second transfer.</p><p class="action-message">SETTLED · NO SECOND PAYMENT</p></div>'
+  if (intent.status === 'blocked') return '<div class="control-box"><span class="detail-label">CONTROLLED ACTION</span><p class="control-copy">This intent is blocked. Resolve the recorded reason or reconcile the existing execution; do not create a new payment.</p></div>'
+  const approveDisabled = intent.status !== 'prepared' ? ' disabled' : ''
+  const simulateDisabled = intent.status !== 'approved' ? ' disabled' : ''
+  const executeDisabled = intent.status !== 'simulated' ? ' disabled' : ''
+  const confirmation = intent.status === 'simulated' ? '<label class="confirm-line"><input id="confirm-payment" type="checkbox" /> I reviewed the canonical hash and approve this KeeperHub broadcast.</label>' : ''
+  return '<div class="control-box"><span class="detail-label">CONTROLLED ACTION</span><p class="control-copy">Actions are state-gated. The final payment stays behind an explicit confirmation and uses the stored canonical hash.</p><div class="action-grid"><button class="action-button" data-action="approve" type="button"' + approveDisabled + '>Approve hash</button><button class="action-button" data-action="simulate" type="button"' + simulateDisabled + '>Simulate</button><button class="action-button primary" data-action="execute" type="button"' + executeDisabled + '>Pay via KeeperHub</button></div>' + confirmation + '<p class="action-message" id="action-message"></p></div>'
+}
+
+async function triggerAction(action, payout, button) {
+  const intent = payout.intent
+  const message = $('#action-message')
+  if (action === 'execute') {
+    if (!$('#confirm-payment')?.checked) { message.textContent = 'Check the confirmation box after reviewing the hash.'; message.classList.add('error'); return }
+    if (!window.confirm('KeeperHub will broadcast this payout using the approved canonical hash. Continue?')) return
+  }
+  button.disabled = true
+  message.classList.remove('error')
+  message.textContent = action === 'execute' ? 'Requesting KeeperHub…' : action === 'simulate' ? 'Simulating without broadcast…' : 'Recording approval…'
+  const body = action === 'simulate' ? {} : { expectedIntentHash: intent.canonicalPayloadHash }
+  try {
+    const response = await fetch('/api/payouts/' + encodeURIComponent(intent.intentId) + '/' + action, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-ReleaseRail-Action': 'confirm' }, body: JSON.stringify(body) })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.error || 'action failed')
+    await load()
+  } catch (error) {
+    message.classList.add('error')
+    message.textContent = error instanceof Error ? error.message : 'action failed'
+    button.disabled = false
+  }
+}
+
 function renderDetail(payout) {
   const panel = $('#detail-column')
   if (!payout) { panel.innerHTML = '<div class="detail-empty"><span class="empty-mark">＋</span><h3>Select an intent</h3><p>Choose a payout from the ledger to inspect its evidence and settlement proof.</p></div>'; return }
@@ -242,13 +290,15 @@ function renderDetail(payout) {
   const candidate = payout.candidate
   const txLink = proof?.transactionLink || intent.transactionLink
   const txHash = proof?.transactionHash || intent.transactionHash
+  const sourceAddress = proof?.sourceAddress
   const verified = proof?.receiptVerified === true
   panel.innerHTML = '<div class="detail-header"><div><span class="detail-label">SELECTED INTENT</span><h3>' + escapeHtml(short(intent.intentId, 18, 8)) + '</h3></div><span class="detail-status ' + statusClass(intent.status) + '">' + statusLabel(intent.status) + '</span></div>' +
     '<div class="detail-section"><span class="detail-label">RELEASE EVIDENCE</span><p class="detail-value">' + escapeHtml(candidate?.repository || 'Candidate unavailable') + ' · ' + escapeHtml(candidate?.tag || '—') + '</p><div class="detail-links">' + (candidate?.releaseUrl ? '<a class="detail-link" href="' + escapeHtml(candidate.releaseUrl) + '" target="_blank" rel="noopener noreferrer">GitHub release ↗</a>' : '') + (candidate?.commitUrl ? '<a class="detail-link" href="' + escapeHtml(candidate.commitUrl) + '" target="_blank" rel="noopener noreferrer">Contribution ↗</a>' : '') + '</div></div>' +
     '<div class="detail-section"><span class="detail-label">CANONICAL PAYLOAD HASH</span><p class="detail-value mono">' + escapeHtml(intent.canonicalPayloadHash) + '</p></div>' +
-    '<div class="detail-section proof-grid"><div class="proof-cell"><span class="detail-label">CHAIN</span><span class="proof-value">Base ' + escapeHtml(String(intent.chainId)) + '</span></div><div class="proof-cell"><span class="detail-label">AMOUNT</span><span class="proof-value">' + escapeHtml(amount(intent.amountBaseUnits)) + '</span></div><div class="proof-cell"><span class="detail-label">RECEIPT</span><span class="proof-value ' + (verified ? 'good' : 'warn') + '">' + (verified ? 'VERIFIED' : 'NOT VERIFIED') + '</span></div><div class="proof-cell"><span class="detail-label">UPDATED</span><span class="proof-value">' + escapeHtml(date(intent.updatedAt)) + '</span></div></div>' +
+    '<div class="detail-section proof-grid"><div class="proof-cell"><span class="detail-label">CHAIN</span><span class="proof-value">Base ' + escapeHtml(String(intent.chainId)) + '</span></div><div class="proof-cell"><span class="detail-label">AMOUNT</span><span class="proof-value">' + escapeHtml(amount(intent.amountBaseUnits)) + '</span></div><div class="proof-cell"><span class="detail-label">SOURCE ACCOUNT</span><span class="proof-value mono">' + escapeHtml(sourceAddress ? short(sourceAddress, 10, 8) : 'KeeperHub org signer') + '</span></div><div class="proof-cell"><span class="detail-label">RECIPIENT ACCOUNT</span><span class="proof-value mono">' + escapeHtml(short(intent.recipientAddress, 10, 8)) + '</span></div><div class="proof-cell"><span class="detail-label">RECEIPT</span><span class="proof-value ' + (verified ? 'good' : 'warn') + '">' + (verified ? 'VERIFIED' : 'NOT VERIFIED') + '</span></div><div class="proof-cell"><span class="detail-label">UPDATED</span><span class="proof-value">' + escapeHtml(date(intent.updatedAt)) + '</span></div></div>' +
     '<div class="detail-section"><span class="detail-label">KEEPERHUB EXECUTION</span><p class="detail-value mono">' + escapeHtml(intent.executionId || 'Not executed') + '</p>' + (txHash ? '<p class="detail-value mono">' + escapeHtml(short(txHash, 18, 10)) + '</p>' : '') + (txLink ? '<div class="detail-links"><a class="detail-link" href="' + escapeHtml(txLink) + '" target="_blank" rel="noopener noreferrer">Open BaseScan transaction ↗</a></div>' : '') + '</div>' +
-    '<div class="detail-section"><span class="detail-label">AUDIT NOTE</span><p class="detail-value">' + (proof?.duplicateReplay ? 'Idempotent replay confirmed — no second transfer was broadcast.' : verified ? 'Independent receipt verification matched the expected recipient and amount.' : escapeHtml(intent.blockedReason || 'Awaiting the next controlled state transition.')) + '</p></div>'
+    '<div class="detail-section"><span class="detail-label">AUDIT NOTE</span><p class="detail-value">' + (proof?.duplicateReplay ? 'Idempotent replay confirmed — no second transfer was broadcast.' : verified ? 'Independent receipt verification matched the expected recipient and amount.' : escapeHtml(intent.blockedReason || 'Awaiting the next controlled state transition.')) + '</p></div>' + renderActions(payout)
+  panel.querySelectorAll('[data-action]').forEach((button) => button.addEventListener('click', () => triggerAction(button.dataset.action, payout, button)))
 }
 
 function render() {

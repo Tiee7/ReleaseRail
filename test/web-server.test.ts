@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWebServer } from '../src/web-server.js'
 import type { DashboardSnapshot } from '../src/web/types.js'
 
@@ -76,5 +76,30 @@ describe('ReleaseRail web server', () => {
 
     const missing = await fetch(`${origin}/missing`)
     expect(missing.status).toBe(404)
+  })
+
+  it('requires an explicit action header before changing payout state', async () => {
+    const approvePayout = vi.fn(async () => snapshot.payouts[0]!.intent)
+    server = createWebServer({ getDashboardSnapshot: async () => snapshot, approvePayout })
+    await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', () => resolve()))
+    const address = server.address()
+    if (address === null || typeof address === 'string') throw new Error('server did not bind to a port')
+    const origin = `http://127.0.0.1:${address.port}`
+
+    const denied = await fetch(`${origin}/api/payouts/intent-demo/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedIntentHash: 'canonical-hash' })
+    })
+    expect(denied.status).toBe(403)
+    expect(approvePayout).not.toHaveBeenCalled()
+
+    const approved = await fetch(`${origin}/api/payouts/intent-demo/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-releaserail-action': 'confirm' },
+      body: JSON.stringify({ expectedIntentHash: 'canonical-hash' })
+    })
+    expect(approved.status).toBe(200)
+    expect(approvePayout).toHaveBeenCalledWith('intent-demo', 'canonical-hash')
   })
 })

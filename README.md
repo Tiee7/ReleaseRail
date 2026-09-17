@@ -36,7 +36,7 @@ To open the local read-only audit console after building:
 pnpm web
 ```
 
-It listens on `http://127.0.0.1:4782` by default and shows the local intent ledger, release evidence, canonical hash, KeeperHub execution identity, BaseScan link, and independent receipt verification. It never exposes credentials or provides a broadcast control.
+It listens on `http://127.0.0.1:4782` by default and shows the local intent ledger, release evidence, canonical hash, KeeperHub execution identity, BaseScan link, spending/receiving accounts, and independent receipt verification. It provides state-gated Approve → Simulate → Pay via KeeperHub controls; it never exposes credentials or private keys.
 
 Publish the main-track repository only through the Tiee7 identity, following [publish.md](docs/publish.md).
 

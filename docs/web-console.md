@@ -1,6 +1,6 @@
 # ReleaseRail web console
 
-The web console is a local, read-only audit surface for operators and judges. It reads the same intent and proof stores as the CLI/MCP service; it does not create intents, approve payouts, simulate, or broadcast transactions.
+The web console is a local audit surface for operators and judges. It reads the same intent and proof stores as the CLI/MCP service. It offers the same state-gated controls as the service—approve, simulate, and pay through KeeperHub—but never handles a private key or lets the browser choose a signer.
 
 ## Start it
 
@@ -25,11 +25,19 @@ The default bind address is `127.0.0.1`. Set `RELEASERAIL_WEB_HOST` only when a 
 - GitHub release and contribution links;
 - canonical payload hash;
 - chain, amount, and recipient-linked payout evidence;
+- the configured KeeperHub organization signer before execution, and the observed on-chain `from` address after settlement;
 - KeeperHub execution identity and transaction hash;
 - BaseScan transaction link when available;
 - independent receipt verification and duplicate-replay note.
 
-The page refreshes every ten seconds and can also be refreshed manually. The server returns only the dashboard snapshot and fixed static assets; it does not return environment variables, API keys, or private keys.
+The page refreshes every ten seconds and can also be refreshed manually. Action requests require the page's explicit confirmation header. The final payment button additionally requires a confirmation checkbox and browser confirmation dialog. The server returns only the dashboard snapshot and fixed static assets; it does not return environment variables, API keys, or private keys.
+
+## Account model
+
+- **Source / spending account:** the wallet configured for the selected KeeperHub organization. ReleaseRail passes the transfer request to KeeperHub; it does not select, import, or store this wallet's private key. After a confirmed transaction, the source is recorded from the chain transaction's `from` address.
+- **Recipient / income account:** the `recipientAddress` in the payout intent. It must match the contributor's address in the local policy allowlist, such as `integrations/ezdsh/payout-policy.json` for the demo.
+
+The UI shows both addresses separately so a reviewer can verify the direction of funds before and after execution.
 
 ## Recording the demo
 
