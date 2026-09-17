@@ -33,6 +33,11 @@ export class IntentStore {
     return state.intents[intentId]
   }
 
+  async list(): Promise<PayoutIntent[]> {
+    const state = await this.read()
+    return Object.values(state.intents).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+  }
+
   async transition(intentId: string, expectedStatus: IntentStatus, nextStatus: IntentStatus, patch: Partial<Pick<PayoutIntent, 'blockedReason' | 'executionOutcome' | 'executionId' | 'transactionHash' | 'transactionLink'>> = {}): Promise<PayoutIntent> {
     const state = await this.read()
     const current = state.intents[intentId]

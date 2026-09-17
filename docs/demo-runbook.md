@@ -9,6 +9,7 @@ This runbook is for a short, reproducible main-track demonstration: EzDSH suppli
 3. Confirm the selected EzDSH release URL and contribution commit URL in a browser or the public GitHub API.
 4. Confirm the KeeperHub API key and RPC URL are available without displaying their values.
 5. Confirm the demo environment points to ReleaseRail, not the EzDSH source directory.
+6. Start the local read-only audit console with `pnpm web` and open `http://127.0.0.1:4782`.
 
 ## Recording sequence
 
@@ -21,6 +22,7 @@ This runbook is for a short, reproducible main-track demonstration: EzDSH suppli
 7. Execute once through KeeperHub, show the execution ID, then show the independently verified Base Sepolia transaction.
 8. Call `execute_payout` a second time and show that the original execution identity is reused.
 9. Call `get_payout_proof` and show the redacted public evidence bundle.
+10. Refresh the ReleaseRail console and select the settled intent. Show the canonical hash, KeeperHub execution identity, `VERIFIED` receipt, and BaseScan link in one view.
 
 ## Stop conditions
 

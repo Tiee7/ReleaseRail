@@ -9,6 +9,7 @@ import { KeeperHubClient, type ExecutionStatus, type SimulationResult } from './
 import { validatePayout } from './policy/policy.js'
 import { readProof, writeProof } from './proof/proof-store.js'
 import { SUPPORTED_RECEIPT_CHAIN_IDS, verifyNativeTransfer, ViemReceiptSource, type ReceiptSource, type ReceiptVerification } from './chain/receipt-verifier.js'
+import type { DashboardCandidate, DashboardPayout, DashboardSnapshot } from './web/types.js'
 
 type CandidateState = { candidates: Record<string, ReleaseCandidate> }
 
@@ -194,6 +195,34 @@ export class ReleaseRailService {
 
   async getPayoutProof(intentIdValue: string): Promise<Awaited<ReturnType<typeof readProof>>> {
     return readProof(this.proofDirectory, intentIdValue)
+  }
+
+  async getDashboardSnapshot(): Promise<DashboardSnapshot> {
+    const [intents, candidates] = await Promise.all([this.intents.list(), this.readCandidates()])
+    const payouts = await Promise.all(intents.map(async (intent): Promise<DashboardPayout> => {
+      const candidate = candidates.candidates[intent.candidateId]
+      const proof = await readProof(this.proofDirectory, intent.intentId)
+      const dashboardCandidate: DashboardCandidate | undefined = candidate === undefined ? undefined : {
+        repository: candidate.repository,
+        tag: candidate.tag,
+        releaseUrl: candidate.releaseUrl,
+        commitUrl: candidate.commitUrl,
+        evidenceHash: candidate.evidenceHash,
+      }
+      return {
+        intent,
+        ...(dashboardCandidate === undefined ? {} : { candidate: dashboardCandidate }),
+        ...(proof === undefined ? {} : { proof }),
+      }
+    }))
+    const settled = intents.filter((intent) => intent.status === 'settled').length
+    const blocked = intents.filter((intent) => intent.status === 'blocked').length
+    const verified = payouts.filter((payout) => payout.proof?.receiptVerified === true).length
+    return {
+      generatedAt: this.now(),
+      summary: { total: intents.length, settled, pending: intents.length - settled - blocked, blocked, verified },
+      payouts,
+    }
   }
 
   private async reconcile(executionId: string): Promise<ExecutionStatus> {

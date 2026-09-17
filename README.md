@@ -30,6 +30,14 @@ Copy and edit the policy example locally, then follow [operations.md](docs/opera
 
 `pnpm preflight` reports whether the local build, policy file, KeeperHub key, and RPC URL are ready without printing any credential values.
 
+To open the local read-only audit console after building:
+
+```bash
+pnpm web
+```
+
+It listens on `http://127.0.0.1:4782` by default and shows the local intent ledger, release evidence, canonical hash, KeeperHub execution identity, BaseScan link, and independent receipt verification. It never exposes credentials or provides a broadcast control.
+
 Publish the main-track repository only through the Tiee7 identity, following [publish.md](docs/publish.md).
 
 ## Safety boundary
@@ -49,6 +57,7 @@ Publish the main-track repository only through the Tiee7 identity, following [pu
 - `src/keeperhub`: simulation, idempotent execution, polling, and redacted errors.
 - `src/chain` and `src/proof`: receipt verification and public proof bundles.
 - `src/releaserail-service.ts`: stateful orchestration shared by CLI and MCP.
+- `src/web-server.ts` and `src/web`: local read-only audit console and dashboard API.
 - `integrations/ezdsh`: clean-checkout MCP configuration and judge prompt.
 
 The separate Feature Bounty work is submitted to KeeperHub as PR #2525; it is not a dependency of this main-track repository.
