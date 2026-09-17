@@ -43,7 +43,8 @@ function receiptSource(overrides: Partial<{ to: `0x${string}`; value: bigint; ch
   }
 }
 
-async function makeService(directory: string, options: { simulationReverts?: boolean; source?: ReceiptSource; statusUnavailable?: boolean } = {}) {
+async function makeService(directory: string, options: { simulationReverts?: boolean; source?: ReceiptSource; statusUnavailable?: boolean; insufficientFundingOnce?: boolean } = {}) {
+  let simulationCalls = 0
   let transferCalls = 0
   const keeperHub = new KeeperHubClient({
     apiKey: fakeApiKey,
@@ -52,6 +53,8 @@ async function makeService(directory: string, options: { simulationReverts?: boo
       if (input.endsWith('/execute/transfer')) {
         transferCalls += 1
         if (init?.body !== undefined && String(init.body).includes('"simulate":true')) {
+          simulationCalls += 1
+          if (options.insufficientFundingOnce === true && simulationCalls === 1) return json({ status: 'failed', wouldRevert: true, error: 'Insufficient BASE balance. Have: 0.0, Need: 0.000000000001 BASE.' }, 400)
           return json({ status: options.simulationReverts ? 'failed' : 'simulated', wouldRevert: options.simulationReverts === true, ...(options.simulationReverts ? { error: 'policy simulation failed' } : {}) })
         }
         return json({ executionId: 'exec-1', status: 'unconfirmed' }, 202)
@@ -131,6 +134,19 @@ describe('ReleaseRailService', () => {
     const second = await service.executePayout(prepared.intentId, prepared.canonicalPayloadHash)
     expect(first.intent).toMatchObject({ status: 'executing', executionId: 'exec-1', executionOutcome: 'unknown' })
     expect(second).toMatchObject({ intent: { status: 'executing', executionId: 'exec-1', executionOutcome: 'unknown' }, execution: { status: 'unknown' } })
+    expect(transferCalls()).toBe(2)
+  })
+
+  it('retries only a funding-blocked simulation with the same intent identity', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'releaserail-service-'))
+    const { service, transferCalls } = await makeService(directory, { insufficientFundingOnce: true })
+    const candidate = await service.releaseCandidate({ repository: 'Tiee7/EzDSH', tag: 'v1.8.1559', contributionCommit: 'contribution-sha', expectedContributor: 'Tiee7' })
+    const prepared = await service.preparePayout({ candidateId: candidate.candidateId, policyId: policy.policyId, recipientAddress: recipient, amountBaseUnits: '1000000', reason: 'Contribution shipped in EzDSH release' })
+    await service.approvePayout(prepared.intentId, prepared.canonicalPayloadHash)
+    const blocked = await service.simulatePayout(prepared.intentId)
+    expect(blocked.intent).toMatchObject({ status: 'blocked', blockedReason: expect.stringContaining('Insufficient BASE balance') })
+    const retried = await service.simulatePayout(prepared.intentId)
+    expect(retried.intent).toMatchObject({ intentId: prepared.intentId, status: 'simulated', blockedReason: null })
     expect(transferCalls()).toBe(2)
   })
 })

@@ -92,7 +92,10 @@ export class ReleaseRailService {
   }
 
   async simulatePayout(intentIdValue: string): Promise<{ intent: PayoutIntent; simulation: SimulationResult }> {
-    const intent = await this.requireIntent(intentIdValue)
+    let intent = await this.requireIntent(intentIdValue)
+    if (intent.status === 'blocked' && this.isRetryableFundingBlock(intent.blockedReason)) {
+      intent = await this.intents.transition(intent.intentId, 'blocked', 'approved', { blockedReason: null })
+    }
     if (intent.status !== 'approved') throw new Error(`intent must be approved before simulation, found ${intent.status}`)
     try {
       const simulation = await this.keeperHub.simulateTransfer({ chainId: intent.chainId, recipientAddress: intent.recipientAddress, amountBaseUnits: intent.amountBaseUnits })
@@ -104,7 +107,7 @@ export class ReleaseRailService {
       return { intent: simulated, simulation }
     } catch (error) {
       const blocked = await this.intents.transition(intent.intentId, 'approved', 'blocked', { blockedReason: error instanceof Error ? error.message : 'simulation failed' })
-      return { intent: blocked, simulation: { status: 'failed', wouldRevert: true, ...(blocked.blockedReason === undefined ? {} : { error: blocked.blockedReason }) } }
+      return { intent: blocked, simulation: { status: 'failed', wouldRevert: true, ...(blocked.blockedReason === undefined || blocked.blockedReason === null ? {} : { error: blocked.blockedReason }) } }
     }
   }
 
@@ -207,6 +210,10 @@ export class ReleaseRailService {
   private executionFromIntent(intent: PayoutIntent): ExecutionStatus {
     if (intent.executionId === undefined) throw new Error('settled intent has no execution identity')
     return { executionId: intent.executionId, status: intent.status, ...(intent.transactionHash === undefined ? {} : { transactionHash: intent.transactionHash }), ...(intent.transactionLink === undefined ? {} : { transactionLink: intent.transactionLink }) }
+  }
+
+  private isRetryableFundingBlock(reason: string | null | undefined): boolean {
+    return reason !== undefined && reason !== null && /insufficient .*balance/i.test(reason)
   }
 
   private async getCandidate(candidateId: string): Promise<ReleaseCandidate> {
