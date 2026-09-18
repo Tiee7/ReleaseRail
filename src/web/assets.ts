@@ -44,7 +44,7 @@ export const html = `<!doctype html>
 
         <section class="console-grid">
           <div class="list-column">
-            <div class="section-heading"><div><p class="eyebrow">PAYOUT LEDGER</p><h2>Recent intents</h2></div><span class="updated" id="updated">Waiting for state…</span></div>
+            <div class="section-heading"><div><p class="eyebrow">RELEASE LEDGER</p><h2>All verified versions</h2></div><span class="updated" id="updated">Waiting for state…</span></div>
             <div class="payout-list" id="payout-list" aria-live="polite"><div class="loading-row"><span></span><span></span><span></span></div><div class="loading-row"><span></span><span></span><span></span></div></div>
           </div>
           <aside class="detail-column" id="detail-column" aria-live="polite">
@@ -131,6 +131,7 @@ h2 { margin-bottom: 0; font-size: 27px; letter-spacing: -.04em; font-weight: 500
 .row-status.settled { background: var(--green); box-shadow: 0 0 0 4px #b7f36b12; }
 .row-status.blocked { background: var(--danger); }
 .row-status.pending { background: var(--warn); }
+.row-status.ready { background: transparent; border: 1px solid var(--green); }
 .row-main { min-width: 0; display: grid; gap: 7px; }
 .row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; }
 .row-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -147,6 +148,7 @@ h2 { margin-bottom: 0; font-size: 27px; letter-spacing: -.04em; font-weight: 500
 .detail-status { align-self: start; padding: 6px 8px; border-radius: 5px; background: #b7f36b16; color: var(--green); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; letter-spacing: .09em; }
 .detail-status.blocked { color: var(--danger); background: #ee8b7e15; }
 .detail-status.pending { color: var(--warn); background: #f3be6815; }
+.detail-status.ready { color: var(--green); background: #b7f36b12; }
 .detail-section { padding: 20px 0; border-bottom: 1px solid var(--line-soft); }
 .detail-section:last-child { border-bottom: 0; padding-bottom: 0; }
 .detail-label { display: block; margin-bottom: 10px; color: var(--faint); }
@@ -168,6 +170,12 @@ h2 { margin-bottom: 0; font-size: 27px; letter-spacing: -.04em; font-weight: 500
 .action-message { min-height: 16px; margin: 0; color: var(--green); font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .action-message.error { color: var(--danger); }
 .source-note { margin: 7px 0 0; color: var(--faint); font-size: 11px; line-height: 1.5; }
+.prepare-box { display: grid; gap: 9px; padding-top: 20px; }
+.prepare-box .detail-label { margin-bottom: 2px; }
+.field-label { margin-top: 5px; color: var(--faint); font: 600 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .13em; }
+.field-control { width: 100%; min-height: 38px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #0f1310; color: var(--text); outline: none; font-size: 12px; }
+.field-control:focus { border-color: var(--green-deep); box-shadow: 0 0 0 3px #b7f36b16; }
+.field-control[readonly] { color: var(--muted); }
 .proof-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .proof-cell { display: grid; gap: 6px; }
 .proof-cell .detail-label { margin-bottom: 0; }
@@ -216,14 +224,14 @@ h2 { margin-bottom: 0; font-size: 27px; letter-spacing: -.04em; font-weight: 500
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 `
 
-export const javascript = `const state = { snapshot: null, selectedIntentId: window.location.hash.slice(1) || null }
+export const javascript = `const state = { snapshot: null, selectedId: window.location.hash.slice(1) || null }
 
 const $ = (selector) => document.querySelector(selector)
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character])
 const short = (value, start = 10, end = 8) => value.length > start + end + 3 ? value.slice(0, start) + '…' + value.slice(-end) : value
 const date = (value) => new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 const amount = (baseUnits) => { try { const value = BigInt(baseUnits); const whole = value / 1000000000000000000n; const fraction = (value % 1000000000000000000n).toString().padStart(18, '0').replace(/0+$/, ''); return fraction ? whole + '.' + fraction.slice(0, 6) + ' ETH' : whole + ' ETH' } catch { return baseUnits + ' wei' } }
-const statusClass = (status) => status === 'settled' ? 'settled' : status === 'blocked' ? 'blocked' : 'pending'
+const statusClass = (status) => status === 'settled' ? 'settled' : status === 'blocked' ? 'blocked' : status === 'ready' ? 'ready' : 'pending'
 const statusLabel = (status) => status === 'settled' ? 'SETTLED' : status === 'blocked' ? 'BLOCKED' : status.toUpperCase()
 
 function renderMetrics(summary) {
@@ -233,19 +241,66 @@ function renderMetrics(summary) {
   document.querySelector('[data-metric="attention"]').textContent = summary.pending + summary.blocked
 }
 
-function renderList(payouts) {
+function renderList(releases) {
   const list = $('#payout-list')
-  if (payouts.length === 0) { list.innerHTML = '<div class="empty-list">No payout intents yet.<br />Create one through the CLI or MCP server.</div>'; return }
-  list.innerHTML = payouts.map((payout) => {
-    const intent = payout.intent
-    const selected = state.selectedIntentId === intent.intentId ? ' selected' : ''
-    return '<button class="payout-row' + selected + '" data-intent="' + escapeHtml(intent.intentId) + '" type="button">' +
-      '<span class="row-status ' + statusClass(intent.status) + '"></span>' +
-      '<span class="row-main"><span class="row-title">' + escapeHtml(payout.candidate?.repository || intent.intentId) + '</span><span class="row-meta">' + escapeHtml(payout.candidate?.tag || intent.policyId) + ' · ' + escapeHtml(short(intent.intentId, 14, 7)) + '</span></span>' +
-      '<span class="row-right"><span class="row-amount">' + escapeHtml(amount(intent.amountBaseUnits)) + '</span><span class="row-status-label">' + statusLabel(intent.status) + '</span></span>' +
+  if (releases.length === 0) { list.innerHTML = '<div class="empty-list">No verified releases yet.<br />Run release_candidate through the CLI or MCP server.</div>'; return }
+  list.innerHTML = releases.map((release) => {
+    const intent = release.payout?.intent
+    const selected = state.selectedId === release.candidate.candidateId || (intent && state.selectedId === intent.intentId) ? ' selected' : ''
+    const status = intent?.status || 'ready'
+    return '<button class="payout-row' + selected + '" data-release="' + escapeHtml(release.candidate.candidateId) + '" type="button">' +
+      '<span class="row-status ' + statusClass(status) + '"></span>' +
+      '<span class="row-main"><span class="row-title">' + escapeHtml(release.candidate.repository) + '</span><span class="row-meta">' + escapeHtml(release.candidate.tag) + ' · ' + escapeHtml(short(release.candidate.candidateId, 14, 7)) + '</span></span>' +
+      '<span class="row-right"><span class="row-amount">' + escapeHtml(intent ? amount(intent.amountBaseUnits) : 'NOT PREPARED') + '</span><span class="row-status-label">' + (intent ? statusLabel(status) : 'READY') + '</span></span>' +
       '</button>'
   }).join('')
-  document.querySelectorAll('[data-intent]').forEach((button) => button.addEventListener('click', () => { state.selectedIntentId = button.dataset.intent; history.replaceState(null, '', '#' + state.selectedIntentId); render() }))
+  document.querySelectorAll('[data-release]').forEach((button) => button.addEventListener('click', () => { state.selectedId = button.dataset.release; history.replaceState(null, '', '#' + state.selectedId); render() }))
+}
+
+function matchingPolicy(release) {
+  return state.snapshot.policies.find((policy) => policy.recipients[release.candidate.expectedContributor]) || null
+}
+
+function recipientFor(policy, release) {
+  return policy?.recipients[release.candidate.expectedContributor] || 'No allowlisted recipient'
+}
+
+function renderPrepareDetail(release) {
+  const panel = $('#detail-column')
+  const policy = matchingPolicy(release)
+  const options = state.snapshot.policies.map((entry) => '<option value="' + escapeHtml(entry.policyId) + '"' + (policy?.policyId === entry.policyId ? ' selected' : '') + '>' + escapeHtml(entry.policyId) + ' · Base ' + escapeHtml(String(entry.chainId)) + '</option>').join('')
+  panel.innerHTML = '<div class="detail-header"><div><span class="detail-label">HISTORICAL RELEASE</span><h3>' + escapeHtml(release.candidate.tag) + '</h3></div><span class="detail-status ready">READY</span></div>' +
+    '<div class="detail-section"><span class="detail-label">RELEASE EVIDENCE</span><p class="detail-value">' + escapeHtml(release.candidate.repository) + '</p><div class="detail-links"><a class="detail-link" href="' + escapeHtml(release.candidate.releaseUrl) + '" target="_blank" rel="noopener noreferrer">GitHub release ↗</a><a class="detail-link" href="' + escapeHtml(release.candidate.commitUrl) + '" target="_blank" rel="noopener noreferrer">Contribution ↗</a></div></div>' +
+    '<div class="detail-section"><span class="detail-label">EVIDENCE HASH</span><p class="detail-value mono">' + escapeHtml(release.candidate.evidenceHash) + '</p></div>' +
+    '<div class="prepare-box"><span class="detail-label">PREPARE PAYOUT</span><p class="control-copy">Create one deterministic intent for this release. The recipient is resolved from the selected policy allowlist.</p>' +
+    (policy ? '<label class="field-label" for="prepare-policy">POLICY</label><select class="field-control" id="prepare-policy">' + options + '</select><label class="field-label" for="prepare-recipient">RECIPIENT ACCOUNT</label><input class="field-control mono" id="prepare-recipient" value="' + escapeHtml(recipientFor(policy, release)) + '" readonly /><label class="field-label" for="prepare-amount">AMOUNT (BASE UNITS)</label><input class="field-control mono" id="prepare-amount" inputmode="numeric" value="1000000" /><label class="field-label" for="prepare-reason">REASON</label><input class="field-control" id="prepare-reason" value="Contribution shipped in ' + escapeHtml(release.candidate.tag) + '" /><button class="action-button primary" data-action="prepare" type="button">Prepare payout</button><p class="action-message" id="prepare-message"></p>' : '<p class="action-message error">No policy allowlists this contributor yet.</p>') + '</div>'
+  const policySelect = panel.querySelector('#prepare-policy')
+  policySelect?.addEventListener('change', () => { const nextPolicy = state.snapshot.policies.find((entry) => entry.policyId === policySelect.value); const recipient = panel.querySelector('#prepare-recipient'); if (recipient) recipient.value = recipientFor(nextPolicy, release) })
+  panel.querySelector('[data-action="prepare"]')?.addEventListener('click', (button) => triggerPrepare(release, button))
+}
+
+async function triggerPrepare(release, button) {
+  const message = $('#prepare-message')
+  const policy = state.snapshot.policies.find((entry) => entry.policyId === $('#prepare-policy').value)
+  const recipient = recipientFor(policy, release)
+  const amountValue = $('#prepare-amount').value.trim()
+  const reason = $('#prepare-reason').value.trim()
+  if (!policy || recipient === 'No allowlisted recipient') { message.textContent = 'Select a policy that allowlists this contributor.'; message.classList.add('error'); return }
+  if (!amountValue || !reason) { message.textContent = 'Amount and reason are required.'; message.classList.add('error'); return }
+  button.disabled = true
+  message.classList.remove('error')
+  message.textContent = 'Creating deterministic intent…'
+  try {
+    const response = await fetch('/api/candidates/' + encodeURIComponent(release.candidate.candidateId) + '/prepare', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-ReleaseRail-Action': 'confirm' }, body: JSON.stringify({ policyId: policy.policyId, recipientAddress: recipient, amountBaseUnits: amountValue, reason }) })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.error || 'prepare failed')
+    state.selectedId = release.candidate.candidateId
+    await load()
+  } catch (error) {
+    message.classList.add('error')
+    message.textContent = error instanceof Error ? error.message : 'prepare failed'
+    button.disabled = false
+  }
 }
 
 function renderActions(payout) {
@@ -304,10 +359,11 @@ function renderDetail(payout) {
 function render() {
   if (!state.snapshot) return
   renderMetrics(state.snapshot.summary)
-  renderList(state.snapshot.payouts)
-  const selected = state.snapshot.payouts.find((payout) => payout.intent.intentId === state.selectedIntentId) || state.snapshot.payouts[0]
-  if (selected && state.selectedIntentId !== selected.intent.intentId) state.selectedIntentId = selected.intent.intentId
-  renderDetail(selected)
+  renderList(state.snapshot.releases)
+  const selected = state.snapshot.releases.find((release) => release.candidate.candidateId === state.selectedId || release.payout?.intent.intentId === state.selectedId) || state.snapshot.releases[0]
+  if (selected && state.selectedId !== selected.candidate.candidateId && state.selectedId !== selected.payout?.intent.intentId) state.selectedId = selected.candidate.candidateId
+  if (selected?.payout) renderDetail(selected.payout)
+  else if (selected) renderPrepareDetail(selected)
   $('#updated').textContent = 'Updated ' + date(state.snapshot.generatedAt)
 }
 

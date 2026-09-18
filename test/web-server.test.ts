@@ -5,6 +5,8 @@ import type { DashboardSnapshot } from '../src/web/types.js'
 const snapshot: DashboardSnapshot = {
   generatedAt: '2026-09-17T00:00:00.000Z',
   summary: { total: 1, settled: 1, pending: 0, blocked: 0, verified: 1 },
+  policies: [{ policyId: 'ezdsh-release-testnet', policyVersion: '2026-09-16.1', chainId: 84532, asset: 'native', maxAmountBaseUnits: '1000000', recipients: { Tiee7: '0x1111111111111111111111111111111111111111' } }],
+  releases: [{ candidate: { candidateId: 'candidate-demo', repository: 'Tiee7/EzDSH', tag: 'v1.8.1559', releaseUrl: 'https://github.com/Tiee7/EzDSH/releases/tag/v1.8.1559', commitUrl: 'https://github.com/Tiee7/EzDSH/commit/demo', contributionCommit: 'demo', expectedContributor: 'Tiee7', evidenceHash: 'evidence-hash' } }],
   payouts: [{
     intent: {
       intentId: 'intent-demo',
@@ -101,5 +103,20 @@ describe('ReleaseRail web server', () => {
     })
     expect(approved.status).toBe(200)
     expect(approvePayout).toHaveBeenCalledWith('intent-demo', 'canonical-hash')
+  })
+
+  it('prepares a payout for a historical release through the guarded route', async () => {
+    const preparePayout = vi.fn(async () => snapshot.payouts[0]!.intent)
+    server = createWebServer({ getDashboardSnapshot: async () => snapshot, preparePayout })
+    await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', () => resolve()))
+    const address = server.address()
+    if (address === null || typeof address === 'string') throw new Error('server did not bind to a port')
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/candidates/candidate-demo/prepare`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-releaserail-action': 'confirm' },
+      body: JSON.stringify({ policyId: 'ezdsh-release-testnet', recipientAddress: '0x1111111111111111111111111111111111111111', amountBaseUnits: '1000000', reason: 'Historical release payout' })
+    })
+    expect(response.status).toBe(200)
+    expect(preparePayout).toHaveBeenCalledWith({ candidateId: 'candidate-demo', policyId: 'ezdsh-release-testnet', recipientAddress: '0x1111111111111111111111111111111111111111', amountBaseUnits: '1000000', reason: 'Historical release payout' })
   })
 })

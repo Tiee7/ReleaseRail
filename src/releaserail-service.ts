@@ -9,7 +9,7 @@ import { KeeperHubClient, type ExecutionStatus, type SimulationResult } from './
 import { validatePayout } from './policy/policy.js'
 import { readProof, writeProof } from './proof/proof-store.js'
 import { SUPPORTED_RECEIPT_CHAIN_IDS, verifyNativeTransfer, ViemReceiptSource, type ReceiptSource, type ReceiptVerification } from './chain/receipt-verifier.js'
-import type { DashboardCandidate, DashboardPayout, DashboardSnapshot } from './web/types.js'
+import type { DashboardCandidate, DashboardPayout, DashboardReleaseCandidate, DashboardSnapshot } from './web/types.js'
 
 type CandidateState = { candidates: Record<string, ReleaseCandidate> }
 
@@ -219,9 +219,34 @@ export class ReleaseRailService {
     const settled = intents.filter((intent) => intent.status === 'settled').length
     const blocked = intents.filter((intent) => intent.status === 'blocked').length
     const verified = payouts.filter((payout) => payout.proof?.receiptVerified === true).length
+    const releases = Object.values(candidates.candidates)
+      .sort((left, right) => right.tag.localeCompare(left.tag, undefined, { numeric: true }))
+      .map((candidate) => {
+        const dashboardCandidate: DashboardReleaseCandidate = {
+          candidateId: candidate.candidateId,
+          repository: candidate.repository,
+          tag: candidate.tag,
+          releaseUrl: candidate.releaseUrl,
+          commitUrl: candidate.commitUrl,
+          contributionCommit: candidate.contributionCommit,
+          expectedContributor: candidate.expectedContributor,
+          evidenceHash: candidate.evidenceHash,
+        }
+        const payout = payouts.find((entry) => entry.intent.candidateId === candidate.candidateId)
+        return payout === undefined ? { candidate: dashboardCandidate } : { candidate: dashboardCandidate, payout }
+      })
     return {
       generatedAt: this.now(),
       summary: { total: intents.length, settled, pending: intents.length - settled - blocked, blocked, verified },
+      policies: Object.values(this.policies).map((policy) => ({
+        policyId: policy.policyId,
+        policyVersion: policy.policyVersion,
+        chainId: policy.chainId,
+        asset: policy.asset,
+        maxAmountBaseUnits: policy.maxAmountBaseUnits,
+        recipients: policy.recipients,
+      })),
+      releases,
       payouts,
     }
   }

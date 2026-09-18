@@ -45,7 +45,8 @@ export function createWebServer(source: DashboardDataSource): Server {
   return createServer(async (request: IncomingMessage, response: ServerResponse) => {
     const path = new URL(request.url ?? '/', 'http://localhost').pathname
     const actionMatch = /^\/api\/payouts\/([A-Za-z0-9_-]+)\/(approve|simulate|execute)$/.exec(path)
-    if (request.method !== 'GET' && !(request.method === 'POST' && actionMatch !== null)) {
+    const prepareMatch = /^\/api\/candidates\/([A-Za-z0-9_-]+)\/prepare$/.exec(path)
+    if (request.method !== 'GET' && !(request.method === 'POST' && (actionMatch !== null || prepareMatch !== null))) {
       response.setHeader('Allow', 'GET')
       sendJson(response, 405, { ok: false, error: 'method not allowed' })
       return
@@ -81,6 +82,26 @@ export function createWebServer(source: DashboardDataSource): Server {
         return sendJson(response, 200, { ok: true, data })
       } catch (error) {
         return sendJson(response, 400, { ok: false, error: error instanceof Error ? error.message : 'action failed' })
+      }
+    }
+    if (prepareMatch !== null) {
+      if (request.method !== 'POST') {
+        response.setHeader('Allow', 'POST')
+        return sendJson(response, 405, { ok: false, error: 'method not allowed' })
+      }
+      if (request.headers['x-releaserail-action'] !== 'confirm') {
+        return sendJson(response, 403, { ok: false, error: 'explicit action confirmation is required' })
+      }
+      try {
+        if (source.preparePayout === undefined) return sendJson(response, 501, { ok: false, error: 'prepare action is unavailable' })
+        const candidateId = prepareMatch[1]
+        if (candidateId === undefined) throw new Error('invalid candidate')
+        const body = await readJson(request)
+        const recipientAddress = requiredString(body, 'recipientAddress') as `0x${string}`
+        const data = await source.preparePayout({ candidateId, policyId: requiredString(body, 'policyId'), recipientAddress, amountBaseUnits: requiredString(body, 'amountBaseUnits'), reason: requiredString(body, 'reason') })
+        return sendJson(response, 200, { ok: true, data })
+      } catch (error) {
+        return sendJson(response, 400, { ok: false, error: error instanceof Error ? error.message : 'prepare failed' })
       }
     }
     if (path === '/api/dashboard') {
